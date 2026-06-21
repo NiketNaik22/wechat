@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: chat-application
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chatdb
+    username: postgres
+    password: NiketNaik
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: ChatHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+
+chat:
+  jwt:
+    secret: "v9y$B&E)H@McQfTjWnZr4u7x!A%D*G-KaPdSgVkYp3s6v9y$B&E)H+MbQeThWmZq"
+    expirationMs: 86400000 # 24 hours
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
