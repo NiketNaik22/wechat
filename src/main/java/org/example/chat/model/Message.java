@@ -36,6 +36,8 @@ public class Message {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    private LocalDateTime readAt;
+
     public enum MessageType {
         TEXT, IMAGE, VIDEO, FILE
     }

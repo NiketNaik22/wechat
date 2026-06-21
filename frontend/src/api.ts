@@ -36,7 +36,7 @@ export interface AuthResponse {
   id: number;
   username: string;
   email: string;
-  displayName?: string; // Add displayName to AuthResponse if backend sends it
+  displayName?: string;
 }
 
 export interface FriendRequest {
@@ -46,10 +46,20 @@ export interface FriendRequest {
   isReceived: boolean;
 }
 
+export interface Message {
+    id?: number;
+    senderId: number;
+    receiverId: number;
+    content: string;
+    timestamp: string;
+    type: 'TEXT' | 'IMAGE' | 'FILE';
+    status: 'SENT' | 'DELIVERED' | 'READ';
+    readAt?: string;
+}
+
 export const login = (data: any) => api.post<AuthResponse>('/auth/signin', data);
 export const signup = (data: any) => api.post('/auth/signup', data);
 export const getUsers = () => api.get<User[]>('/users');
-export const createUser = (user: User) => api.post<User>('/users', user);
 export const getCurrentUser = () => api.get<User>('/users/me');
 export const getMyFriends = () => api.get<User[]>('/users/me/friends');
 
@@ -63,9 +73,15 @@ export const unfriendUser = (friendId: number) => api.post(`/friend-requests/unf
 export const blockUser = (userId: number) => api.post(`/friend-requests/block/${userId}`);
 export const unblockUser = (userId: number) => api.post(`/friend-requests/unblock/${userId}`);
 
+// Message APIs
+export const getConversations = () => api.get<User[]>('/messages/conversations');
+export const getConversation = (friendId: number) => api.get<Message[]>(`/messages/conversation/${friendId}`);
+
 // WebSocket Client
 let stompClient: Client | null = null;
 let notificationListeners: ((notification: any) => void)[] = [];
+let messageListeners: ((message: Message) => void)[] = [];
+let readReceiptListeners: ((message: Message) => void)[] = [];
 
 export const addNotificationListener = (listener: (notification: any) => void) => {
     notificationListeners.push(listener);
@@ -73,6 +89,44 @@ export const addNotificationListener = (listener: (notification: any) => void) =
 
 export const removeNotificationListener = (listener: (notification: any) => void) => {
     notificationListeners = notificationListeners.filter(l => l !== listener);
+};
+
+export const addMessageListener = (listener: (message: Message) => void) => {
+    messageListeners.push(listener);
+};
+
+export const removeMessageListener = (listener: (message: Message) => void) => {
+    messageListeners = messageListeners.filter(l => l !== listener);
+};
+
+export const addReadReceiptListener = (listener: (message: Message) => void) => {
+    readReceiptListeners.push(listener);
+};
+
+export const removeReadReceiptListener = (listener: (message: Message) => void) => {
+    readReceiptListeners = readReceiptListeners.filter(l => l !== listener);
+};
+
+export const sendMessage = (message: Omit<Message, 'id' | 'timestamp' | 'status' | 'type' | 'readAt'>) => {
+    if (stompClient && stompClient.active) {
+        stompClient.publish({
+            destination: '/app/chat',
+            body: JSON.stringify(message),
+        });
+    } else {
+        console.error('STOMP client is not connected.');
+    }
+};
+
+export const sendReadReceipt = (messageId: number) => {
+    if (stompClient && stompClient.active) {
+        stompClient.publish({
+            destination: '/app/read',
+            body: String(messageId),
+        });
+    } else {
+        console.error('STOMP client is not connected.');
+    }
 };
 
 export const connectWebSocket = () => {
@@ -84,39 +138,33 @@ export const connectWebSocket = () => {
     }
 
     stompClient = new Client({
-        // Append token to URL so the HTTP handshake is authenticated
         brokerURL: `${WS_URL}?token=${token}`,
-        connectHeaders: {
-            Authorization: `Bearer ${token}`
-        },
+        connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
-        // Fallback to SockJS if raw WS fails
-        webSocketFactory: () => {
-            return new SockJS(`${SOCKJS_URL}?token=${token}`);
-        },
+        webSocketFactory: () => new SockJS(`${SOCKJS_URL}?token=${token}`),
         onConnect: () => {
             console.log('Connected to WebSocket successfully!');
-            // Listen on the user-specific queue
             stompClient?.subscribe('/user/queue/friend-requests', (message) => {
-                console.log("Raw WS message received:", message.body);
                 if (message.body) {
-                    const notification = JSON.parse(message.body);
-                    notificationListeners.forEach(listener => listener(notification));
+                    notificationListeners.forEach(listener => listener(JSON.parse(message.body)));
+                }
+            });
+            stompClient?.subscribe('/user/queue/messages', (message) => {
+                if (message.body) {
+                    messageListeners.forEach(listener => listener(JSON.parse(message.body)));
+                }
+            });
+            stompClient?.subscribe('/user/queue/read-receipts', (message) => {
+                if (message.body) {
+                    readReceiptListeners.forEach(listener => listener(JSON.parse(message.body)));
                 }
             });
         },
-        onStompError: (frame) => {
-            console.error('Broker reported error: ' + frame.headers['message']);
-            console.error('Additional details: ' + frame.body);
-        },
-        onWebSocketError: (event) => {
-            console.error('WebSocket Error:', event);
-        },
-        onDisconnect: () => {
-            console.log("Disconnected from WebSocket");
-        }
+        onStompError: (frame) => console.error('Broker reported error: ' + frame.headers['message']),
+        onWebSocketError: (event) => console.error('WebSocket Error:', event),
+        onDisconnect: () => console.log("Disconnected from WebSocket")
     });
 
     stompClient.activate();

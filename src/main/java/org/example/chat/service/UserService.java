@@ -80,7 +80,7 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    private UserDTO mapToDTO(User user) {
+    public UserDTO mapToDTO(User user) {
         return UserDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())

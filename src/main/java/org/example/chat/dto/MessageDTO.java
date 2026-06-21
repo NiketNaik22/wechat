@@ -20,4 +20,5 @@ public class MessageDTO {
     private Message.MessageType type;
     private Message.MessageStatus status;
     private LocalDateTime timestamp;
+    private LocalDateTime readAt;
 }

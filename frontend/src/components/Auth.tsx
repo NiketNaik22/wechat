@@ -54,7 +54,6 @@ const Auth: React.FC<AuthProps> = ({ onLoginSuccess }) => {
       // Also checking for 400 because sometimes Spring Security or custom exceptions return 400
       if (isLogin && (error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 400)) {
          setHasLoginError(true);
-         alert('Incorrect username or password. Please try again.');
       } else {
          // Generic fallback for other errors (like 500 server error, or registration conflicts)
          alert(error.response?.data?.message || error.response?.data || 'An error occurred during authentication.');
